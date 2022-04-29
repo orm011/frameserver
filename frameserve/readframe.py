@@ -34,7 +34,6 @@ import PIL.Image
 import os
 import tempfile
 
-
 def _get_frame_ffmpeg_file(path, frame_index):
     import skvideo
     ffmpeg_path = skvideo._FFMPEG_PATH

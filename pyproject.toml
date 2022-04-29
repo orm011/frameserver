@@ -12,6 +12,7 @@ Pillow = "~9"
 av = "~9"
 pandas = "~1"
 tqdm = "^4.64.0"
+pyarrow = "^7.0.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"

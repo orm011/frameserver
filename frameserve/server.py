@@ -11,7 +11,6 @@ app = FastAPI()
 
 @app.get("/{video_path:path}/{frame_index}")
 def get_frame(video_path : str, frame_index : int):
-    print(video_path)
     if not video_path.startswith('/'):
         video_path = '/' + video_path
 
