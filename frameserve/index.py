@@ -1,3 +1,4 @@
+from genericpath import exists
 import av
 import pandas as pd
 from collections import deque
@@ -9,8 +10,9 @@ def get_frame_info(path, use_tqdm=False):
 
     #for basic api https://pyav.org/docs/develop/cookbook/basics.html
     with av.open(path) as container:
-        frames = container.streams.video[0].frames
-        with tqdm(total=frames) as pbar:
+        stream = container.streams.video[0]
+        frames = stream.frames
+        with tqdm(total=stream.frames) as pbar:
             frame_no = 0
             for packet_no, packet in enumerate(container.demux(video=[0])):
                 if packet.is_keyframe:
@@ -47,6 +49,23 @@ def get_frame_info(path, use_tqdm=False):
     frame_df.index = frame_df.index.rename('frame_index')
     return pd.DataFrame(packet_info), frame_df
 
+import os
+def _get_cache_path(video_path):
+    cache_root = os.environ.get('FRAMESERVER_CACHE', None)
+    if cache_root is None:
+        assert os.environ.get("HOME")
+        cache_root = f'{os.environ.get("HOME")}/.cache/frameserver'
+        
+    cache_root = os.path.realpath(cache_root)
+    os.makedirs(cache_root, exist_ok=True)
+
+    video_path = os.path.realpath(os.path.expanduser(video_path))
+    fullpath =  os.path.normpath(f'{cache_root}/{video_path}')
+
+    os.makedirs(fullpath, exist_ok=True)
+    return fullpath
+
+import sys
 class VideoFrameIndex:
     def __init__(self, packet_df, frame_df):
         self.packet_df = packet_df
@@ -56,9 +75,31 @@ class VideoFrameIndex:
         assert self.frame_df.index.is_monotonic_increasing
         
     @staticmethod
-    def from_video_file(path):
+    def _from_video_file(path):
         packet_df, frame_df = get_frame_info(path)
         return VideoFrameIndex(packet_df, frame_df)
+
+    @staticmethod
+    def get_index(video_path): ## main entry point. will compute index if not done before
+        cpath = _get_cache_path(video_path)
+        try:
+            return VideoFrameIndex.load(cpath)
+        except:
+            pass
+        index = VideoFrameIndex._from_video_file(video_path)
+        index.save(cpath)
+        return index
+        
+    @staticmethod
+    def load(cache_path):
+        packet_df = pd.read_parquet(f'{cache_path}/packet_df.parquet')
+        frame_df = pd.read_parquet(f'{cache_path}/frame_df.parquet')
+        return VideoFrameIndex(packet_df, frame_df)
+
+    def save(self, save_path):
+        os.makedirs(save_path, exist_ok=True)
+        self.packet_df.to_parquet(f'{save_path}/packet_df.parquet')
+        self.frame_df.to_parquet(f'{save_path}/frame_df.parquet')
 
     def get_packet_coordinates(self, frame_index):
         ent = self.frame_df[['packet_no', 'packet_frame_index']].loc[frame_index]
@@ -79,3 +120,4 @@ class VideoFrameIndex:
             ans.append(self._get_byte_coords(packet_no))
             
         return ans
+

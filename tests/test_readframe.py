@@ -18,7 +18,7 @@ def test_getframe_indexed(params):
     path = params['path']
     indices = np.array(params['indices'])
     results = np.zeros_like(indices) - 1
-    index = VideoFrameIndex.from_video_file(path)
+    index = VideoFrameIndex._from_video_file(path)
 
     reference_method = 'sequential'
 
@@ -29,7 +29,7 @@ def test_getframe_indexed(params):
             result = get_frame(path, frame_index, method='indexed_seek', index=index)
         except IndexError:
             results[i] = -1
-        else:    
+        else:
             results[i] = (np.array(reference) == np.array(result)).all()
 
     print(np.stack([indices, results]))
