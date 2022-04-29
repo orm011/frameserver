@@ -6,6 +6,12 @@ authors = ["Oscar Moll <orm@csail.mit.edu>"]
 
 [tool.poetry.dependencies]
 python = "^3.8"
+fastapi = "~0.75"
+uvicorn = "~0.17"
+Pillow = "~9"
+av = "~9"
+pandas = "~1"
+tqdm = "^4.64.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
