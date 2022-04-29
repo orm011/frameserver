@@ -9,10 +9,13 @@ from typing import Optional
 app = FastAPI()
 #app.mount("/", StaticFiles(directory="/"), name="static")
 
-@app.get("/getframe")
-def get_frame(fpath : str, frame : Optional[int] = None):
-    print(fpath, frame)
-    image = rf.get_frame(fpath, frame)
+@app.get("/{video_path:path}/{frame_index}")
+def get_frame(video_path : str, frame_index : int):
+    print(video_path)
+    if not video_path.startswith('/'):
+        video_path = '/' + video_path
+
+    image = rf.get_frame(video_path, frame_index)
     f = io.BytesIO()
     image.save(f, format='PNG')
     f.seek(0)
