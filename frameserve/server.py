@@ -14,8 +14,7 @@ def get_frame(video_path : str, frame_index : int):
     if not video_path.startswith('/'):
         video_path = '/' + video_path
 
-    image = rf.get_frame(video_path, frame_index)
+    image = rf.get_frame(video_path, frame_index, method='indexed_seek')
     f = io.BytesIO()
     image.save(f, format='PNG')
-    f.seek(0)
-    return Response(content=f.read(), media_type='image/png')
+    return Response(content=f.getvalue(), media_type='image/png')

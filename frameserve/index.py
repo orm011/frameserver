@@ -14,26 +14,25 @@ def get_frame_info(path, use_tqdm=False):
         frames = stream.frames
         with tqdm(total=stream.frames) as pbar:
             frame_no = 0
-            for packet_no, packet in enumerate(container.demux(video=[0])):
+            for packet_no, packet in enumerate(container.demux(stream)):
                 if packet.is_keyframe:
                     keyframe_packet = packet_no
-
-                if packet.pos is None:
-                    assert frames - frame_no < 5, 'the last few packets can be dummy ones according to pyav. normally see 2'
-                    pbar.update()
-                    continue
             
+                if packet.pos:
+                    pos = packet.pos # implies it will re-use previous pos when none
+                    ## assumes first pos exists...
+                
                 packet_info.append({'packet_no':packet_no, 
                                     'is_keyframe':packet.is_keyframe,
                                     'keyframe_packet_no':keyframe_packet,
-                                    'packet_pos':packet.pos,
+                                    'packet_pos':pos,
                                     'packet_size':packet.size})
             
                 num_frames = 0
                 for frame in packet.decode():
                     frame_info.append({
                                 'frame_no':frame_no,
-                                'frame_index':frame.index,
+                                'frame_index':frame.index, # saving it but seems unreliable
                                 'frame_picture_type':frame.pict_type.name, 
                                 'packet_no':packet_no,
                                 'packet_frame_index':num_frames,
@@ -45,8 +44,7 @@ def get_frame_info(path, use_tqdm=False):
                 packet_info[-1]['num_frames'] = num_frames
                 pbar.update()
 
-    frame_df = pd.DataFrame(frame_info).set_index('frame_index').sort_index()
-    frame_df.index = frame_df.index.rename('frame_index')
+    frame_df = pd.DataFrame(frame_info)
     return pd.DataFrame(packet_info), frame_df
 
 import os
@@ -71,24 +69,29 @@ class VideoFrameIndex:
         self.packet_df = packet_df
         self.frame_df = frame_df
 
-        ## frames are assumed to be indexed by frame.index as returned in a sequential read
-        assert self.frame_df.index.is_monotonic_increasing
-        
     @staticmethod
     def _from_video_file(path):
         packet_df, frame_df = get_frame_info(path)
         return VideoFrameIndex(packet_df, frame_df)
 
     @staticmethod
-    def get_index(video_path): ## main entry point. will compute index if not done before
+    def get_index(video_path, invalidate=False): ## main entry point. will compute index if not done before
         cpath = _get_cache_path(video_path)
+
+        def _compute():
+            index = VideoFrameIndex._from_video_file(video_path)
+            index.save(cpath)
+            return index
+
+        if invalidate:
+            return _compute()
+
         try:
             return VideoFrameIndex.load(cpath)
         except:
             pass
-        index = VideoFrameIndex._from_video_file(video_path)
-        index.save(cpath)
-        return index
+
+        return _compute()
         
     @staticmethod
     def load(cache_path):
@@ -102,7 +105,7 @@ class VideoFrameIndex:
         self.frame_df.to_parquet(f'{save_path}/frame_df.parquet')
 
     def get_packet_coordinates(self, frame_index):
-        ent = self.frame_df[['packet_no', 'packet_frame_index']].loc[frame_index]
+        ent = self.frame_df[['packet_no', 'packet_frame_index']].iloc[frame_index]
         key_no = self.packet_df.keyframe_packet_no.iloc[ent.packet_no]
         return {'key_packet_idx':int(key_no), # packet no where to init codec
                 'local_packet_idx':int(ent.packet_no - key_no), # how many packets to decode after

@@ -2,14 +2,19 @@ import av
 import pandas as pd
 from collections import deque
 
-def _get_frame_sequential1(path, frame_index):
+def _get_frame_sequential1(path, frame_index, *, return_av=False, multi_thread=False):
     """sequentially decode until get to frame
     """
     with av.open(path) as container:
-        #stream.thread_type = "AUTO" # faster but not sure it works
-        for frame in container.decode(video=0):#demux(video=[0]):
-            if frame.index == frame_index:
-                return frame.to_image()
+        stream = container.streams.video[0]
+        if multi_thread:
+            stream.thread_type = "AUTO" # faster but not sure it works
+        for frame_no, frame in enumerate(container.decode(stream)):
+            if frame_no == frame_index:
+                if return_av:
+                    return frame
+                else:
+                    return frame.to_image()
 
         raise IndexError('no such frame in video')
 
@@ -34,6 +39,13 @@ import PIL.Image
 import os
 import tempfile
 
+def _get_frame_skvideo(path, frame_index):
+    import skvideo.io
+    reader = skvideo.io.FFmpegReader(path)
+    for i,frm in enumerate(reader):
+        if i == frame_index:
+            return PIL.Image.fromarray(frm)
+        
 def _get_frame_ffmpeg_file(path, frame_index):
     import skvideo
     ffmpeg_path = skvideo._FFMPEG_PATH
@@ -42,40 +54,19 @@ def _get_frame_ffmpeg_file(path, frame_index):
             "-i",
             path,
             "-vf",
-            f"select='eq(n\,{frame_index})'",
+            f"select='eq(n,{frame_index})'",
             "-vframes",
             "1",
-            '-pix_fmt',
-            "rgb24",
+            # '-pix_fmt',
+            # "rgb24",
             "-f",
             "image2",
             '/tmp/frame.png',
         ]
     
+    ## todo, use pipe
     subprocess.check_call(cmd)
     return PIL.Image.open('/tmp/frame.png')
-
-def _get_frame_ffmpeg_pipe(path, frame_index):
-    import skvideo
-    ffmpeg_path = skvideo._FFMPEG_PATH
-
-    cmd = [ f'{ffmpeg_path}/ffmpeg',
-            # '-y', # overwrite
-            "-i",
-            path,
-            "-vf",
-            f"select='eq(n\,{frame_index})'",
-            "-vframes",
-            "1",
-            '-pix_fmt',
-            "rgb24",
-            "-f",
-            "image2pipe",
-            '-',
-        ]
-
-    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    #return PIL.Image.open('/tmp/frame.png')
 
 import copy
 from .index import VideoFrameIndex
@@ -146,7 +137,7 @@ def _get_packets_v2(path, byte_ranges):
     codec = _make_codec(path)
     return packets, codec
 
-def _get_frame_indexed_internal(path, frame_index, index : VideoFrameIndex, method='seek'):
+def _get_frame_indexed_internal(path, frame_index, *, index : VideoFrameIndex, method='seek'):
     """ use available metadata to skip as much work (IO and decode) as possible
     """
     coords = index.get_packet_coordinates(frame_index)
@@ -162,12 +153,22 @@ def _get_frame_indexed_internal(path, frame_index, index : VideoFrameIndex, meth
     frame = _decode_up_to(packets, lambda : codec, coords['local_packet_idx'], coords['local_frame_idx'])
     return frame.to_image()
     
-def get_frame(path, frame_index, method='sequential', index : VideoFrameIndex = None) -> PIL.Image.Image:
+def get_frame(path, frame_index, method='sequential', index : VideoFrameIndex = None, fallback=False) -> PIL.Image.Image:
     mapping = {
-        'sequential':_get_frame_sequential2,
-        'indexed_packet': lambda a, b : _get_frame_indexed_internal(a, b, index, method='packet'),
-        'indexed_seek': lambda a, b : _get_frame_indexed_internal(a, b, index, method='seek'),
+        'sequential':_get_frame_sequential1,
+        'sequential_demux':_get_frame_sequential2,
+        'indexed_packet': lambda a, b : _get_frame_indexed_internal(a, b, index=index, method='packet'),
+        'indexed_seek': lambda a, b : _get_frame_indexed_internal(a, b, index=index, method='seek'),
+        'ffmpeg': _get_frame_ffmpeg_file,
     }
 
     fn = mapping[method]
-    return fn(path, frame_index)
+    try:
+        if method.startswith('indexed'):
+            return fn(path, frame_index)
+        else:
+            return fn(path, frame_index)
+    except:
+        if fallback:
+            return _get_frame_sequential1(path, frame_index)
+        raise
