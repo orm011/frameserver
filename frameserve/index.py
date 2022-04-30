@@ -63,7 +63,48 @@ def _get_cache_path(video_path):
     os.makedirs(fullpath, exist_ok=True)
     return fullpath
 
+
+import PIL.Image
+import skvideo.io
 import sys
+import json
+
+_rotation_map = {'90':PIL.Image.Transpose.ROTATE_90,
+                '270':PIL.Image.Transpose.ROTATE_270,
+                '180':PIL.Image.Transpose.ROTATE_180,
+                '0':None,
+                }
+
+class FFProbe:
+    def __init__(self, ffprobe):
+        self.ffprobe = ffprobe if ffprobe else {}
+
+    @staticmethod
+    def get(path):
+        ffprobe = skvideo.io.ffprobe(path)
+        return FFProbe(ffprobe)
+
+    def get_rotation(self):
+        rot =  (self.ffprobe.get('video', {})
+            .get('side_data_list', {})
+            .get('side_data', {})
+            .get('@rotation', None))
+
+        return _rotation_map.get(rot, None)
+
+    def get_frame_size(self):
+        x = self.ffprobe
+        width = int(x.get('video',{}).get('@width', None))
+        height = int(x.get('video',{}).get('@height', None))
+
+        rot = self.get_rotation()
+        if rot in [PIL.Image.Transpose.ROTATE_90, PIL.Image.Transpose.ROTATE_270]:
+            tmp = width
+            width = height
+            height = tmp
+        
+        return (width, height)
+    
 class VideoFrameIndex:
     def __init__(self, packet_df, frame_df):
         self.packet_df = packet_df
@@ -87,7 +128,9 @@ class VideoFrameIndex:
             return _compute()
 
         try:
-            return VideoFrameIndex.load(cpath)
+            index =  VideoFrameIndex.load(cpath)
+            if index.ffprobe == {}: # compute ffprobe if not have one
+                index.save(cpath)
         except:
             pass
 
@@ -97,7 +140,11 @@ class VideoFrameIndex:
     def load(cache_path):
         packet_df = pd.read_parquet(f'{cache_path}/packet_df.parquet')
         frame_df = pd.read_parquet(f'{cache_path}/frame_df.parquet')
-        return VideoFrameIndex(packet_df, frame_df)
+        
+        if os.exists(f'{cache_path}/ffprobe.json'):
+             ffprobe = json.load(open(f'{cache_path}/ffprobe.json', 'r'))
+
+        return VideoFrameIndex(packet_df, frame_df, ffprobe)
 
     def save(self, save_path):
         os.makedirs(save_path, exist_ok=True)

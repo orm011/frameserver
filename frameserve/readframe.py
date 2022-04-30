@@ -153,7 +153,14 @@ def _get_frame_indexed_internal(path, frame_index, *, index : VideoFrameIndex, m
     frame = _decode_up_to(packets, lambda : codec, coords['local_packet_idx'], coords['local_frame_idx'])
     return frame.to_image()
     
-def get_frame(path, frame_index, method='sequential', index : VideoFrameIndex = None, fallback=False) -> PIL.Image.Image:
+from .index import FFProbe
+
+
+def get_frame(path, frame_index, *, method='indexed_packet', index : VideoFrameIndex = None, fallback=True) -> PIL.Image.Image:
+    ffprobe = FFProbe.get(path)
+
+    rotation = ffprobe.get_rotation()
+
     mapping = {
         'sequential':_get_frame_sequential1,
         'sequential_demux':_get_frame_sequential2,
@@ -162,13 +169,18 @@ def get_frame(path, frame_index, method='sequential', index : VideoFrameIndex = 
         'ffmpeg': _get_frame_ffmpeg_file,
     }
 
-    fn = mapping[method]
-    try:
-        if method.startswith('indexed'):
+    def _closure() -> PIL.Image.Image:
+        fn = mapping[method]
+        try:
             return fn(path, frame_index)
-        else:
-            return fn(path, frame_index)
-    except:
-        if fallback:
-            return _get_frame_sequential1(path, frame_index)
-        raise
+        except:
+            if fallback:
+                return _get_frame_sequential1(path, frame_index)
+            raise
+
+    frm = _closure()
+    if rotation:
+        return frm.transpose(method=rotation)
+    else:
+        return frm
+        
