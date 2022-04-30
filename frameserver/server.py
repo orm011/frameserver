@@ -1,4 +1,4 @@
-from frameserve.index import VideoFrameIndex
+from .index import VideoFrameIndex
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from . import readframe as rf
