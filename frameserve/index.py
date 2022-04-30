@@ -128,9 +128,7 @@ class VideoFrameIndex:
             return _compute()
 
         try:
-            index =  VideoFrameIndex.load(cpath)
-            if index.ffprobe == {}: # compute ffprobe if not have one
-                index.save(cpath)
+            return VideoFrameIndex.load(cpath)
         except:
             pass
 
@@ -140,11 +138,7 @@ class VideoFrameIndex:
     def load(cache_path):
         packet_df = pd.read_parquet(f'{cache_path}/packet_df.parquet')
         frame_df = pd.read_parquet(f'{cache_path}/frame_df.parquet')
-        
-        if os.exists(f'{cache_path}/ffprobe.json'):
-             ffprobe = json.load(open(f'{cache_path}/ffprobe.json', 'r'))
-
-        return VideoFrameIndex(packet_df, frame_df, ffprobe)
+        return VideoFrameIndex(packet_df, frame_df)
 
     def save(self, save_path):
         os.makedirs(save_path, exist_ok=True)

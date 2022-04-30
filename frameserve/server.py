@@ -16,7 +16,7 @@ def get_frame(video_path : str, frame_index : int):
         video_path = '/' + video_path
 
     index = VideoFrameIndex.get_index(video_path)
-    image = rf.get_frame(video_path, frame_index, method='indexed_seek', index=index)
+    image = rf.get_frame(video_path, frame_index, index=index)
     f = io.BytesIO()
     image.save(f, format='PNG')
     return Response(content=f.getvalue(), media_type='image/png')
