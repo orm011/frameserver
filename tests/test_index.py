@@ -1,4 +1,4 @@
-from frameserve.index import VideoFrameIndex, _get_cache_path
+from frameserver.index import VideoFrameIndex, _get_cache_path
 import av
 import av.datasets
 import numpy as np
