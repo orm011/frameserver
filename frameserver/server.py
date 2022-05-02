@@ -1,22 +1,36 @@
-from .index import VideoFrameIndex
+from .kfbased import KeyFrameIndex, get_frame2
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from . import readframe as rf
 from fastapi.responses import Response
 import io
-
+from multiprocessing import Pool
 from typing import Optional
+
+
+pool = Pool(10)
 
 app = FastAPI()
 #app.mount("/", StaticFiles(directory="/"), name="static")
 
-@app.get("/{video_path:path}/{frame_index}")
-def get_frame(video_path : str, frame_index : int):
+@app.get("/{video_path:path}/{keyframe_no}/{frame_no}")
+def get_frame(video_path : str, keyframe_no : int, frame_no : int):
     if not video_path.startswith('/'):
         video_path = '/' + video_path
 
-    index = VideoFrameIndex.get_index(video_path)
-    image = rf.get_frame(video_path, frame_index, index=index)
+    index = KeyFrameIndex.get(video_path, pool=pool)
+    image = get_frame2(video_path, keyframe_no=keyframe_no, frame_no=frame_no, index=index)
+    f = io.BytesIO()
+    image.save(f, format='PNG')
+    return Response(content=f.getvalue(), media_type='image/png')
+
+@app.get("/args/{video_path:path}/")
+def get_frame(video_path : str, keyframe_no : int, frame_no : int):
+    if not video_path.startswith('/'):
+        video_path = '/' + video_path
+
+    index = KeyFrameIndex.get(video_path, pool=pool)
+    image = get_frame2(video_path, keyframe_no=keyframe_no, frame_no=frame_no, index=index)
     f = io.BytesIO()
     image.save(f, format='PNG')
     return Response(content=f.getvalue(), media_type='image/png')

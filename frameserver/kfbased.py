@@ -140,3 +140,15 @@ def _get_frame_reference_impl(path,  *, keyframe_no : int, frame_no: int):
                 curr_frame_no+=1
                 
         raise FrameNotFoundException()
+
+from .index import FFProbe
+import PIL.Image
+
+def get_frame2(path, *, keyframe_no, frame_no, index : KeyFrameIndex = None) -> PIL.Image.Image:
+    ffprobe = FFProbe.get(path)
+    rotation = ffprobe.get_rotation()
+    frm = get_frame(path, keyframe_no=keyframe_no, frame_no=frame_no, index=index)
+    if rotation:
+        return frm.transpose(method=rotation)
+    else:
+        return frm
