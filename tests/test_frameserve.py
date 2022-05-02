@@ -1,4 +1,4 @@
-from frameserve import __version__
+from frameserver import __version__
 
 
 def test_version():
