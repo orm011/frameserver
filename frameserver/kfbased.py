@@ -17,7 +17,7 @@ def _get_keyframe_index_part(path_long, start_pts=None, end_pts=None):
             
         pts = deque()
         for frame in container.decode(stream):
-            if end_pts and frame.pts >= end_pts:
+            if end_pts is not None and frame.pts >= end_pts:
                 break
             pts.append((int(frame.pts), frame.time))
     
@@ -33,14 +33,15 @@ def _get_tasks_pts(stream, granularity='5 min'):
     assert part_list[-1] + delta >= stream.start_time + stream.duration
     return part_list, delta
 
-def _get_keyframe_index(path_long, pool=None):
+def _get_keyframe_index(path_long, pool=None, granularity='5 min'):
     with av.open(path_long, 'r') as container:
         stream = container.streams.video[0]
         if pool: # can use a multiprocess pool or a ray pool
-            starts, delta = _get_tasks_pts(stream)
+            starts, delta = _get_tasks_pts(stream, granularity=granularity)
             tuples = [(path_long, start_pts, start_pts + delta) for start_pts in starts]
             dfs = pool.starmap(_get_keyframe_index_part, tuples)
             df = pd.concat(dfs, ignore_index=True)
+            df = df.drop_duplicates().reset_index(drop=True) # some subtasks may end up overlapping
         else:
             df = _get_keyframe_index_part(path_long, start_pts=None, end_pts=None)
     return df
@@ -53,16 +54,16 @@ class KeyFrameIndex:
         self.df = keyframe_df
 
     @staticmethod
-    def _from_video_file(path):
-        df = _get_keyframe_index(path)
+    def _from_video_file(path, pool=None):
+        df = _get_keyframe_index(path, pool)
         return KeyFrameIndex(df)
 
     @staticmethod
-    def get(video_path, invalidate=False): ## main entry point. will compute index if not done before
+    def get(video_path, invalidate=False, pool=None): ## main entry point. will compute index if not done before
         cpath = _get_cache_path(video_path)
 
         def _compute():
-            index = KeyFrameIndex._from_video_file(video_path)
+            index = KeyFrameIndex._from_video_file(video_path, pool=None)
             index.save(cpath)
             return index
 
@@ -83,7 +84,7 @@ class KeyFrameIndex:
 
     def save(self, save_path):
         os.makedirs(save_path, exist_ok=True)
-        self.packet_df.to_parquet(f'{save_path}/keyframe_df.parquet')
+        self.df.to_parquet(f'{save_path}/keyframe_df.parquet')
 
     def get_pts(self, keyframe_no):
         if keyframe_no >= self.df.shape[0]:
@@ -105,11 +106,10 @@ def _get_pts(path, keyframe_no, index=None):
             
         raise FrameNotFoundException()
     
-def get_frame(path,  *, keyframe_no : int, frame_no: int = 0, 
+def get_frame(path,  *, keyframe_no : int, frame_no: int, 
                         index : KeyFrameIndex = None , 
                         thread_type : str =None):
     key_pts = _get_pts(path, keyframe_no, index=index)        
-    assert key_pts
     with av.open(path, 'r') as container:
         stream = container.streams.video[0]
         if thread_type:
@@ -122,4 +122,21 @@ def get_frame(path,  *, keyframe_no : int, frame_no: int = 0,
     
             if i == frame_no:
                 return frame.to_image()            
+        raise FrameNotFoundException()
+
+def _get_frame_reference_impl(path,  *, keyframe_no : int, frame_no: int):
+    curr_keyframe = -1
+    curr_frame_no = 0
+    with av.open(path, 'r') as container:
+        stream = container.streams.video[0]
+        for frame in container.decode(stream):
+            if frame.key_frame and curr_keyframe != keyframe_no:
+                curr_keyframe+=1
+            
+            if curr_keyframe == keyframe_no:
+                if curr_frame_no == frame_no:
+                    return frame.to_image()
+
+                curr_frame_no+=1
+                
         raise FrameNotFoundException()
