@@ -4,6 +4,7 @@ import pandas as pd
 from collections import deque
 from tqdm.auto import tqdm
 
+# somewhat slow for eg one hour videos.
 def get_frame_info(path, use_tqdm=False):
     frame_info = deque()
     packet_info = deque()
@@ -26,6 +27,8 @@ def get_frame_info(path, use_tqdm=False):
                                     'is_keyframe':packet.is_keyframe,
                                     'keyframe_packet_no':keyframe_packet,
                                     'packet_pos':pos,
+                                    'packet_pts':packet.pts,
+                                    'packet_dts':packet.dts,
                                     'packet_size':packet.size})
             
                 num_frames = 0
@@ -35,6 +38,8 @@ def get_frame_info(path, use_tqdm=False):
                                 'frame_index':frame.index, # saving it but seems unreliable
                                 'frame_picture_type':frame.pict_type.name, 
                                 'packet_no':packet_no,
+                                'frame_dts':frame.dts,
+                                'frame_pts':frame.pts,
                                 'packet_frame_index':num_frames,
                                 'time_s':frame.time,
                                 })
@@ -164,4 +169,5 @@ class VideoFrameIndex:
             ans.append(self._get_byte_coords(packet_no))
             
         return ans
+
 
