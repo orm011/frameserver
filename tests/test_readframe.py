@@ -1,5 +1,7 @@
-from frameserve.readframe import get_frame
-from frameserve.index import VideoFrameIndex, FFProbe
+from frameserver.readframe import get_frame
+from frameserver.index import VideoFrameIndex, FFProbe
+
+from .shared import *
 
 import av
 import av.datasets
@@ -9,23 +11,18 @@ import math
 import tempfile
 import os
 
-testdatadir = f'{os.path.dirname(__file__)}/data/'
-
 frames = [
         dict(path=av.datasets.curated("pexels/time-lapse-video-of-night-sky-857195.mp4"), 
                 indices=[0,1,2,72,73,74,75,101,147,148,149,150,164,165], 
                 exclude = [73, 74, 148, 149]),
         dict(path=av.datasets.curated("pexels/time-lapse-video-of-sunset-by-the-sea-854400.mp4"), 
                 indices=[0,1,2], exclude=[]),
-        dict(path=f'{testdatadir}/bdd_b1d0091f-75824d0d_5s.mov', 
+        dict(path=f'{TESTDATADIR}/bdd_b1d0091f-75824d0d_5s.mov', 
                 indices=[0,1,2], exclude=[], 
                 size=(1280, 720)),
-        dict(path=f'{testdatadir}/panama_bird_feeder_sample.tsv',indices=[0,1,2], exclude=[],
+        dict(path=f'{TESTDATADIR}/panama_bird_feeder_sample.tsv',indices=[0,1,2], exclude=[],
                 size=(1920,1080))
 ]
-
-import itertools
-os.environ['FRAMESERVER_CACHE'] = tempfile.mkdtemp() # so that indices are re-computed but also shared
 
 @pytest.mark.parametrize('params', frames)
 def test_getframe(params):
