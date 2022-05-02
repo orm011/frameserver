@@ -1,40 +1,50 @@
-from .kfbased import KeyFrameIndex, get_frame2
-from fastapi import FastAPI
+from .kfbased import KeyFrameIndex, get_frame2, FrameNotFoundException
+from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from . import readframe as rf
-from fastapi.responses import Response
+from fastapi.responses import Response, HTMLResponse
 import io
 from multiprocessing import Pool
 from typing import Optional
-
+import os
 
 pool = Pool(10)
 
 app = FastAPI()
-#app.mount("/", StaticFiles(directory="/"), name="static")
 
-@app.get("/{video_path:path}/{keyframe_no}/{frame_no}")
-def get_frame(video_path : str, keyframe_no : int, frame_no : int):
+app.mount("/static/", StaticFiles(directory="/"), name="static")
+
+
+@app.get("/frame/{video_path:path}")
+def get_frame_args(video_path : str, keyframe_no : int, frame_no : int = 0):
     if not video_path.startswith('/'):
         video_path = '/' + video_path
 
+    if not os.path.isfile(video_path):
+        raise HTTPException(status_code=404, detail=f'video {video_path} does not exist')
+
     index = KeyFrameIndex.get(video_path, pool=pool)
-    image = get_frame2(video_path, keyframe_no=keyframe_no, frame_no=frame_no, index=index)
+        
+    try:
+        image = get_frame2(video_path, keyframe_no=keyframe_no, frame_no=frame_no, index=index)
+    except FrameNotFoundException:
+        raise HTTPException(status_code=404, detail=f'frame {keyframe_no=} {frame_no=} does not exist in video')
+
     f = io.BytesIO()
     image.save(f, format='PNG')
     return Response(content=f.getvalue(), media_type='image/png')
 
-@app.get("/args/{video_path:path}/")
-def get_frame(video_path : str, keyframe_no : int, frame_no : int):
+@app.get("/video_meta/{video_path:path}")
+def get_meta(video_path : str):
     if not video_path.startswith('/'):
         video_path = '/' + video_path
 
-    index = KeyFrameIndex.get(video_path, pool=pool)
-    image = get_frame2(video_path, keyframe_no=keyframe_no, frame_no=frame_no, index=index)
-    f = io.BytesIO()
-    image.save(f, format='PNG')
-    return Response(content=f.getvalue(), media_type='image/png')
+    if not os.path.isfile(video_path):
+        raise HTTPException(status_code=404, detail=f'video {video_path} does not exist')
 
+    index = KeyFrameIndex.get(video_path, pool=pool)
+
+    return HTMLResponse(content=index.df.to_html())
 
 if __name__ == '__main__':
     import uvicorn
