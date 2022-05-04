@@ -1,5 +1,5 @@
 from frameserver.readframe import get_frame
-from frameserver.index import VideoFrameIndex, FFProbe
+from frameserver.index import VideoFrameIndex
 
 from .shared import *
 
@@ -32,7 +32,6 @@ def test_getframe(params):
     indices = np.array(params['indices'])
     results = np.zeros_like(indices) - 1
     index = VideoFrameIndex.get_index(path)
-    ffprobe = FFProbe.get(path)
         
     spec_size = params.get('size')
 
