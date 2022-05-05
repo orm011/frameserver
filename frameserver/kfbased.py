@@ -3,10 +3,25 @@ import av
 import pandas as pd
 import sys
 import os
-from .index import _get_cache_path
 from .util import get_pts_intervals
 import math
 import numpy as np
+
+import os
+def _get_cache_path(video_path):
+    cache_root = os.environ.get('FRAMESERVER_CACHE', None)
+    if cache_root is None:
+        assert os.environ.get("HOME")
+        cache_root = f'{os.environ.get("HOME")}/.cache/frameserver'
+        
+    cache_root = os.path.realpath(cache_root)
+    os.makedirs(cache_root, exist_ok=True)
+
+    video_path = os.path.realpath(os.path.expanduser(video_path))
+    fullpath =  os.path.normpath(f'{cache_root}/{video_path}')
+
+    os.makedirs(fullpath, exist_ok=True)
+    return fullpath
 
 def _get_keyframe_index_part(path_long, start_pts=None, end_pts=None):
     with av.open(path_long) as container:
