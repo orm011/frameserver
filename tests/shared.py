@@ -12,5 +12,7 @@ TESTDATADIR = f'{os.path.dirname(__file__)}/data/'
 VIDEO_PATHS = {
     'NIGHT_SKY':av.datasets.curated("pexels/time-lapse-video-of-night-sky-857195.mp4"),
     'BDD_SAMPLE':f'{TESTDATADIR}/bdd_b1d0091f-75824d0d_5s.mov',
+    'BDD_SAMPLE_MP4':f'{TESTDATADIR}/bdd_b1d0091f-75824d0d_5s.mp4',
     'BIRD_FEEDER_SAMPLE':f'{TESTDATADIR}/panama_bird_feeder_sample.tsv',
+    'BIRD_FEEDER_SAMPLE_MP4':f'{TESTDATADIR}/panama_bird_feeder_sample.mp4',
 }

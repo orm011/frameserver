@@ -4,8 +4,9 @@ import pandas as pd
 import sys
 import os
 from .index import _get_cache_path
-
+from .util import get_pts_intervals
 import math
+import numpy as np
 
 def _get_keyframe_index_part(path_long, start_pts=None, end_pts=None):
     with av.open(path_long) as container:
@@ -23,27 +24,20 @@ def _get_keyframe_index_part(path_long, start_pts=None, end_pts=None):
     
     return pd.DataFrame(pts, columns=['frame_pts', 'time_s'])
 
-def _get_tasks_pts(stream, granularity='5 min'):
-    granularity_s = pd.Timedelta(granularity).total_seconds()
-    duration_s = float(stream.duration * stream.time_base)
-    num_parts = duration_s / granularity_s
-    delta = math.ceil(stream.duration/num_parts)
-    starts = list(range(0, stream.duration, delta))
-    part_list = [stream.start_time + pts for pts in starts]
-    assert part_list[-1] + delta >= stream.start_time + stream.duration
-    return part_list, delta
-
 def _get_keyframe_index(path_long, pool=None, granularity='5 min'):
     with av.open(path_long, 'r') as container:
         stream = container.streams.video[0]
         if pool: # can use a multiprocess pool or a ray pool
-            starts, delta = _get_tasks_pts(stream, granularity=granularity)
-            tuples = [(path_long, start_pts, start_pts + delta) for start_pts in starts]
+            intervals = get_pts_intervals(stream, granularity=granularity)
+            tuples = [(path_long, itval[0], itval[-1]) for itval in intervals]
             dfs = pool.starmap(_get_keyframe_index_part, tuples)
             df = pd.concat(dfs, ignore_index=True)
             df = df.drop_duplicates().reset_index(drop=True) # some subtasks may end up overlapping
         else:
             df = _get_keyframe_index_part(path_long, start_pts=None, end_pts=None)
+
+    df = df.sort_values('frame_pts').reset_index(drop=True)
+    assert df.frame_pts.is_monotonic_increasing
     return df
 
 class FrameNotFoundException(Exception):
@@ -91,6 +85,9 @@ class KeyFrameIndex:
             raise FrameNotFoundException()
         else:
             return int(self.df.iloc[keyframe_no].frame_pts)
+
+    def get_keyframe_no(self, pts):
+        return np.where(self.df.frame_pts.values <= pts)[0][-1]
 
 def _get_pts(path, keyframe_no, index=None):
     if index is not None:

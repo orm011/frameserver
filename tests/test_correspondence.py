@@ -1,4 +1,4 @@
-from frameserver.iterator import VideoIterator
+from frameserver.iterator import VideoReader
 from frameserver.kfbased import FrameNotFoundException, get_frame2, KeyFrameIndex
 import pytest
 from .shared import *
@@ -32,17 +32,18 @@ frames = [
 def test_equal(params):
     """ tests that image from iterator and image from random access are the same
     """
-    x = VideoIterator(params['path'])
+    x = VideoReader(params['path'])
     index = KeyFrameIndex.get(params['path'])
 
     for tup in x:
-        key = (tup['keyframe_no'], tup['frame_no'])
+        keyframe_no = index.get_keyframe_no(tup['keyframe_pts'])
+        key = (keyframe_no, tup['frame_no'])
         if  key in params['indices']:
             print(tup)
             frm2 = get_frame2(params['path'], keyframe_no=key[0], frame_no=key[1], index=index)
             assert (np.array(frm2) == np.array(tup['image'])).all()
 
-    bad_keys = [(key[0], key[1] + 1), (key[0]+1, 0)]
+    bad_keys = [(keyframe_no, key[1] + 1), (keyframe_no+1, 0)]
     for bad_key in bad_keys:
         with pytest.raises(FrameNotFoundException):
             get_frame2(params['path'], keyframe_no=bad_key[0], frame_no=bad_key[1], index=index)
@@ -53,11 +54,12 @@ def test_kf_equal(params):
     """ tests that image from iterator and image from random access are the same
             when scanning on keyframe mode
     """
-    x = VideoIterator(params['path'], keyframes_only=True)
+    x = VideoReader(params['path'])
     index = KeyFrameIndex.get(params['path'])
 
-    for (i,tup) in enumerate(x):
-        key = (tup['keyframe_no'], tup['frame_no'])
+    for (i,tup) in enumerate(x.read(keyframes_only=True)):
+        keyframe_no = index.get_keyframe_no(tup['keyframe_pts'])
+        key = (keyframe_no, tup['frame_no'])
         assert key[1] == 0
         assert tup['is_keyframe']
 
