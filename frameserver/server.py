@@ -1,7 +1,6 @@
 from .kfbased import KeyFrameIndex, get_frame, FrameNotFoundException
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
-from . import readframe as rf
 from fastapi.responses import Response, HTMLResponse
 import io
 from multiprocessing import Pool

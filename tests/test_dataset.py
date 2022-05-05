@@ -15,7 +15,7 @@ import numpy as np
 
 @pytest.mark.parametrize('path,num_workers', list(product(videos, [11])))
 def test_dataloader_all(path, num_workers):
-    vd = TorchVideoDataset(path, image_tx=image_md5)
+    vd = TorchVideoDataset(path, format='image', image_tx=image_md5)
 
     def process_batches(batches):
         pts = torch.cat([b['pts'] for b in batches])
