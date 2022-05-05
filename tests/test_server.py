@@ -15,3 +15,13 @@ def test_frame():
     f = io.BytesIO(response.content)
     img = PIL.Image.open(f)
     img.load()
+
+def test_frame_pts():
+    url = f"/frame/{VIDEO_PATHS['BDD_SAMPLE_MP4']}?pts={0}"
+    response = client.get(url)
+    print(response)
+    assert response.status_code == 200
+    assert response.headers.get('content-type') == 'image/png'
+    f = io.BytesIO(response.content)
+    img = PIL.Image.open(f)
+    img.load()

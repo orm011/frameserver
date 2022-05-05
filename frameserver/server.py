@@ -1,4 +1,4 @@
-from .kfbased import KeyFrameIndex, get_frame2, FrameNotFoundException
+from .kfbased import KeyFrameIndex, get_frame, FrameNotFoundException
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from . import readframe as rf
@@ -11,12 +11,11 @@ import os
 pool = Pool(10)
 
 app = FastAPI()
-
 app.mount("/static/", StaticFiles(directory="/"), name="static")
 
 
 @app.get("/frame/{video_path:path}")
-def get_frame_args(video_path : str, keyframe_no : int, frame_no : int = 0):
+def get_frame_args(video_path : str, keyframe_no : int = None, frame_no : int = 0, pts : int = None):
     if not video_path.startswith('/'):
         video_path = '/' + video_path
 
@@ -26,7 +25,7 @@ def get_frame_args(video_path : str, keyframe_no : int, frame_no : int = 0):
     index = KeyFrameIndex.get(video_path, pool=pool)
         
     try:
-        image = get_frame2(video_path, keyframe_no=keyframe_no, frame_no=frame_no, index=index)
+        image = get_frame(video_path, keyframe_no=keyframe_no, frame_no=frame_no, pts=pts, pts_mode='exact', index=index)
     except FrameNotFoundException:
         raise HTTPException(status_code=404, detail=f'frame {keyframe_no=} {frame_no=} does not exist in video')
 

@@ -8,7 +8,8 @@ import os
 import hashlib
 import numpy as np
 
-def get_md5(image):
+def image_md5(image):
+    assert isinstance(image, PIL.Image.Image)
     x = np.array(image)
     if not x.flags['C_CONTIGUOUS']:
         x = np.ascontiguousarray(x)

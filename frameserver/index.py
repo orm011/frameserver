@@ -74,8 +74,6 @@ import skvideo.io
 import sys
 import json
 
-
-    
 class VideoFrameIndex:
     def __init__(self, packet_df, frame_df):
         self.packet_df = packet_df

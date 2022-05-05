@@ -3,8 +3,7 @@ from torch.utils.data import DataLoader
 import pytest
 from frameserver.dataset import TorchVideoDataset
 from .shared import *
-from frameserver.kfbased import KeyFrameIndex
-from frameserver.util import get_md5
+from frameserver.util import image_md5
 videos = [
         av.datasets.curated("pexels/time-lapse-video-of-night-sky-857195.mp4"),
         VIDEO_PATHS['BDD_SAMPLE_MP4'],
@@ -16,7 +15,7 @@ import numpy as np
 
 @pytest.mark.parametrize('path,num_workers', list(product(videos, [11])))
 def test_dataloader_all(path, num_workers):
-    vd = TorchVideoDataset(path, image_tx=get_md5)
+    vd = TorchVideoDataset(path, image_tx=image_md5)
 
     def process_batches(batches):
         pts = torch.cat([b['pts'] for b in batches])

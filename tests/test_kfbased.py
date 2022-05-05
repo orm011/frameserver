@@ -1,5 +1,5 @@
 import tempfile
-from frameserver.kfbased import KeyFrameIndex, get_frame, _get_keyframe_index, _get_frame_reference_impl
+from frameserver.kfbased import KeyFrameIndex, _get_frame_internal, _get_keyframe_index, _get_frame_reference_impl
 import pytest
 import av
 import os
@@ -14,14 +14,14 @@ frames = [
                         (2,0,),(2,1),(2,15)
                     ]
             ),
-        dict(path=VIDEO_PATHS['BDD_SAMPLE'], # keyframes every 15
+        dict(path=VIDEO_PATHS['BDD_SAMPLE_MP4'], # keyframes every 15
                 indices=[
                         (0,0),(0,1),(0,14),(0,15),(0,16),(1,0),(2,0),(2,1),(3,10),
                         (0,151),(9,0),(9,8) # last frames
                         ],
                 beyond_last = [(0,152), (9,9), (10,0)],
                 size=(1280, 720)),
-        dict(path=VIDEO_PATHS['BIRD_FEEDER_SAMPLE'], # every 150
+        dict(path=VIDEO_PATHS['BIRD_FEEDER_SAMPLE_MP4'], # every 150
                 indices=[
                         (0,0),(0,1),(0,149),(0,150),(1,0),(1,1),(1,149),
                         (0,899), (5,0),(5,1),(5,149), # last frames
@@ -42,7 +42,6 @@ def test_parallel(params, pool):
     pdf = _get_keyframe_index(path, pool, granularity='8 seconds')
     df = _get_keyframe_index(path)
     assert pdf.shape == df.shape
-
 
 @pytest.mark.parametrize('params', frames)
 def test_kfindex(params, pool):
@@ -73,10 +72,9 @@ def test_getframe(params, pool):
     path = params['path']
     index = KeyFrameIndex.get(path, pool)
     for (keyframe_no, frame_no) in params['indices']:
-        print(keyframe_no, frame_no)
         reference = _get_frame_reference_impl(path, keyframe_no=keyframe_no, frame_no=frame_no)
-        testframe1 = get_frame(path, keyframe_no=keyframe_no, frame_no=frame_no)
-        testframe_index = get_frame(path, keyframe_no=keyframe_no, frame_no=frame_no, index=index)
+        testframe1 = _get_frame_internal(path, keyframe_no=keyframe_no, frame_no=frame_no)
+        testframe_index = _get_frame_internal(path, keyframe_no=keyframe_no, frame_no=frame_no, index=index)
 
         assert testframe1 == reference
         assert testframe_index == reference

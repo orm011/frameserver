@@ -5,8 +5,12 @@ from .util import get_pts_intervals
 import av
 
 class TorchVideoDataset(torch.utils.data.IterableDataset):
-    def __init__(self, path, keyframes_only=False, image_tx=None):
-        txs = [T.ToTensor()]
+    def __init__(self, path, format='tensor', keyframes_only=False, image_tx=None):
+        assert format in ['image', 'tensor']
+        txs = []
+        if format == 'tensor':
+            txs.append(T.ToTensor())
+        
         if image_tx is not None:
             txs.append(image_tx)
         self.tx = T.Compose(txs)

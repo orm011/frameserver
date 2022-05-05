@@ -103,45 +103,75 @@ def _get_pts(path, keyframe_no, index=None):
             
         raise FrameNotFoundException()
     
-def get_frame(path,  *, keyframe_no : int, frame_no: int, 
-                        index : KeyFrameIndex = None , 
+def _get_frame_internal(path,  *, keyframe_no : int = None, frame_no: int = None, 
+                        pts : int = None,
+                        pts_mode : str = 'exact', # exact, predecessor, successor or nearest 
+                        index : KeyFrameIndex = None,
                         thread_type : str =None):
-    key_pts = _get_pts(path, keyframe_no, index=index)        
+
+    assert pts_mode == 'exact', 'not implemented yet'
+    if pts is not None:
+        seek_pts = pts
+    else:
+        seek_pts = _get_pts(path, keyframe_no, index=index)
+
     with av.open(path, 'r') as container:
         stream = container.streams.video[0]
         if thread_type:
             assert thread_type in ['FRAME', 'AUTO']
             container.streams.video[0].thread_type = thread_type
-        container.seek(offset=key_pts, backward=True, any_frame=False, stream=stream)
+        container.seek(offset=seek_pts, backward=True, any_frame=False, stream=stream)
         for i,frame in enumerate(container.decode(stream)):
             if i == 0:
-                assert frame.pts == key_pts
+                if seek_pts >= stream.start_time:
+                    assert frame.pts <= seek_pts, 'seek needs to start before pts for us to find it'
+                if keyframe_no is not None:
+                    assert frame.pts == seek_pts
     
-            if i == frame_no:
-                return frame.to_image()            
+            if pts is not None:
+                if frame.pts == pts:
+                    return frame.to_image()
+
+                if pts_mode == 'exact' and frame.pts > pts:
+                    raise FrameNotFoundException()
+
+            else: 
+                if i == frame_no:
+                    return frame.to_image()
+
         raise FrameNotFoundException()
 
-def _get_frame_reference_impl(path,  *, keyframe_no : int, frame_no: int):
+def _get_frame_reference_impl(path,  *, keyframe_no : int = None, frame_no: int = None, pts : int = None, pts_mode : str = 'exact'):
     curr_keyframe = -1
     curr_frame_no = 0
     with av.open(path, 'r') as container:
         stream = container.streams.video[0]
         for frame in container.decode(stream):
-            if frame.key_frame and curr_keyframe != keyframe_no:
-                curr_keyframe+=1
-            
-            if curr_keyframe == keyframe_no:
-                if curr_frame_no == frame_no:
-                    return frame.to_image()
-
-                curr_frame_no+=1
+            if keyframe_no is not None:
+                if frame.key_frame and curr_keyframe != keyframe_no:
+                    curr_keyframe+=1
                 
+                if curr_keyframe == keyframe_no:
+                    if curr_frame_no == frame_no:
+                        return frame.to_image()
+
+                    curr_frame_no+=1
+            else:
+                if frame.pts == pts:
+                    return frame.to_image()
+                elif frame.pts > pts:
+                    raise FrameNotFoundException()
+                else:
+                    continue
+
         raise FrameNotFoundException()
 
 from .util import get_image_rotation_tx
 import PIL.Image
 
-def get_frame2(path, *, keyframe_no, frame_no, index : KeyFrameIndex = None) -> PIL.Image.Image:
+def get_frame(path, *, keyframe_no = None, frame_no = None, pts:int = None, pts_mode:str ='exact', index : KeyFrameIndex = None) -> PIL.Image.Image:
+    if pts is not None:
+        pts = int(pts)
     rotation_tx = get_image_rotation_tx(path)
-    frm = get_frame(path, keyframe_no=keyframe_no, frame_no=frame_no, index=index)
+    frm = _get_frame_internal(path, keyframe_no=keyframe_no, frame_no=frame_no, pts=pts, pts_mode=pts_mode, index=index)
     return rotation_tx(frm)
