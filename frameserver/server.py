@@ -21,8 +21,11 @@ def get_frame_args(video_path : str, keyframe_no : int = None, frame_no : int = 
     if not os.path.isfile(video_path):
         raise HTTPException(status_code=404, detail=f'video {video_path} does not exist')
 
-    index = KeyFrameIndex.get(video_path, pool=pool)
-        
+    if pts is None: 
+        index = KeyFrameIndex.get(video_path, pool=pool)
+    else: # no need for index if we're using pts directly
+        index = None
+
     try:
         image = get_frame(video_path, keyframe_no=keyframe_no, frame_no=frame_no, pts=pts, pts_mode='exact', index=index)
     except FrameNotFoundException:
